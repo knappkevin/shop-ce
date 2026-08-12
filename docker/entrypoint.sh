@@ -46,6 +46,7 @@ setup_environment() {
 install_theme_from_git() {
     local theme="$1"
     local repo_url="$2"
+    local branch="$3"
     local view_dir="source/Application/views/${theme}"
     local out_dir="source/out/${theme}"
 
@@ -81,7 +82,7 @@ EOF
         log "${theme}: working tree already present, skipping clone"
     else
         log "Cloning ${theme} from ${repo_url}..."
-        git clone --branch main "$repo_url" "$view_dir" \
+        git clone --branch ${branch} "$repo_url" "$view_dir" \
             || handle_error "Failed to clone ${theme} from ${repo_url}"
     fi
 
@@ -122,7 +123,7 @@ install_theme() {
 }
 
 install_o3_theme() {
-    install_theme_from_git o3-theme https://github.com/o3-shop/o3-Theme.git
+    install_theme_from_git o3-theme https://github.com/knappkevin/o3-Theme.git fix/search-products-per-page
 }
 
 # Function to install dependencies
@@ -139,6 +140,8 @@ start_apache() {
     # Enable Apache modules
     a2enmod rewrite || handle_error "Failed to enable Apache rewrite module"
     a2enmod ssl || handle_error "Failed to enable Apache ssl module"
+
+    chown -R www-data:www-data /var/www/html/source/tmp /var/www/html/source/log /var/www/html/source/out/pictures/generated 2>/dev/null || true
 
     log "${GREEN}Starting Apache...${NC}"
     rm /tmp/o3setup-running
@@ -393,7 +396,6 @@ main() {
     install_demodata || exit 127
     install_tinymce_editor || exit 127
     setup_db || exit 127
-    install_theme || exit 127
     install_o3_theme || exit 127
     start_apache || exit 127
 }
