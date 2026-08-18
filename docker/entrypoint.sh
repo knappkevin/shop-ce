@@ -79,7 +79,30 @@ Aborting so no work is destroyed.
 EOF
             )"
         fi
-        log "${theme}: working tree already present, skipping clone"
+        log "${theme}: working tree already present, pulling latest from ${branch}..."
+        export GIT_CONFIG_GLOBAL=/dev/null
+        export GIT_CONFIG_COUNT=1
+        export GIT_CONFIG_KEY_0=safe.directory
+        export GIT_CONFIG_VALUE_0="*"
+        if git -C "$view_dir" fetch origin "$branch"; then
+            local current_branch
+            current_branch=$(git -C "$view_dir" symbolic-ref --short HEAD 2>/dev/null || true)
+            if [ "$current_branch" != "$branch" ]; then
+                log "Switching ${theme} from ${current_branch} to ${branch}..."
+                git -C "$view_dir" stash --include-untracked 2>/dev/null || true
+                git -C "$view_dir" checkout "$branch" \
+                    || handle_error "Failed to checkout ${branch} for ${theme}"
+            fi
+            if git -C "$view_dir" pull --ff-only origin "$branch"; then
+                log "Clearing compiled templates for ${theme}..."
+                find source/tmp/smarty -name "*.php" -delete 2>/dev/null || true
+            else
+                log "${YELLOW}Warning: git pull failed for ${theme}, using existing working tree${NC}"
+            fi
+        else
+            log "${YELLOW}Warning: git fetch failed for ${theme}, using existing working tree${NC}"
+        fi
+        unset GIT_CONFIG_GLOBAL GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
     else
         log "Cloning ${theme} from ${repo_url}..."
         git clone --branch ${branch} "$repo_url" "$view_dir" \
@@ -123,7 +146,7 @@ install_theme() {
 }
 
 install_o3_theme() {
-    install_theme_from_git o3-theme https://github.com/knappkevin/o3-Theme.git fix/search-products-per-page
+    install_theme_from_git o3-theme https://github.com/knappkevin/o3-Theme.git main
 }
 
 # Function to install dependencies
