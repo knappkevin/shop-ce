@@ -95,3 +95,17 @@ template/JS proves nothing about whether the frontend exists. Do NOT report "fea
 frontend / endpoint is unreachable" as a finding on a shop-ce PR — the counterpart lives in
 `wave-theme` / `o3-Theme`. Ask for the theme-repo PR link instead. (Incident: PR #219 review,
 2026-07-31 — the claim was posted and had to be retracted. See `tasks/lessons.md`.)
+
+## Update 2026-08-22: single theme repo instance + stream orchestrator
+
+The standalone `~/Projects/o3-Theme` clone was RETIRED (all refs pushed; a
+leftover stash contained only stale `out/` build artifacts, verified before
+deletion). The canonical clone is
+`shop-ce/source/Application/views/o3-theme`; parallel streams use `git
+worktree`s of it created by `./docker.sh stream start <issue#|name>`, which
+also boots a per-stream compose stack (own DB `o3shop_<port>`, deterministic
+ports) and an in-container `gulp dev --watch`. Never create a second
+standalone theme clone; never run stop/start to switch streams — see AGENTS.md
+"Parallel Work Streams". Gotcha: pgrep self-match — a `pgrep -f "gulp dev"`
+inside the same bash -c that embeds that string always matches itself;
+the watcher uses a pidfile + /proc/<pid>/cmdline check instead.
