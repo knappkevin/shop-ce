@@ -84,10 +84,43 @@ start_containers() {
             exit 1
         fi
         DBROOT=$(grep "^O3SHOP_CONF_DBROOT=" "$MY_DIR/.env.example" | cut -d= -f2- | tr -d '"')
+
+        # A running DB container is not a ready DB: MariaDB may still be
+        # initialising, and granting too early silently fails (the old code
+        # swallowed the error with 2>/dev/null, which surfaced later as an
+        # opaque "Access denied ... to database <name>" inside o3-setup).
+        # Wait for readiness, then create+grant and VERIFY before proceeding.
+        echo "Waiting for shared MariaDB to accept connections..."
+        local db_ready=0
+        for _ in $(seq 1 30); do
+            if docker exec "$DB_CONTAINER" mysqladmin ping -uroot -p"${DBROOT}" --silent >/dev/null 2>&1; then
+                db_ready=1
+                break
+            fi
+            sleep 2
+        done
+        if [ "$db_ready" -ne 1 ]; then
+            echo "ERROR: shared MariaDB never became ready (container $DB_CONTAINER)."
+            exit 1
+        fi
+
         echo "Creating database ${O3SHOP_CONF_DBNAME} in shared MariaDB..."
-        docker exec "$DB_CONTAINER" mysql -uroot -p"${DBROOT}" -e \
+        if ! docker exec "$DB_CONTAINER" mysql -uroot -p"${DBROOT}" -e \
             "CREATE DATABASE IF NOT EXISTS \`${O3SHOP_CONF_DBNAME}\`;
-             GRANT ALL ON \`${O3SHOP_CONF_DBNAME}\`.* TO 'o3shop'@'%';" 2>/dev/null
+             GRANT ALL ON \`${O3SHOP_CONF_DBNAME}\`.* TO 'o3shop'@'%';" ; then
+            echo "ERROR: failed to create/grant database ${O3SHOP_CONF_DBNAME}."
+            exit 1
+        fi
+
+        # Verify the app user can actually see it (catches stale/partial grants).
+        local db_seen=""
+        db_seen=$(docker exec "$DB_CONTAINER" mysql -uo3shop -po3shop -N \
+            -e "SHOW DATABASES LIKE '${O3SHOP_CONF_DBNAME}'" 2>/dev/null)
+        if [ -z "$db_seen" ]; then
+            echo "ERROR: database ${O3SHOP_CONF_DBNAME} not visible to user 'o3shop' after grant."
+            exit 1
+        fi
+        echo "Database ${O3SHOP_CONF_DBNAME} ready (visible to o3shop)."
     fi
 
     COMPOSE_PROFILES=""

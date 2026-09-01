@@ -52,10 +52,11 @@ install_theme_from_git() {
     log "${YELLOW}Installing ${theme} theme...${NC}"
 
     if [ -d "$view_dir" ] && [ "$(ls -A "$view_dir")" ]; then
-        if [ ! -d "$view_dir/.git" ]; then
+        if [ ! -e "$view_dir/.git" ]; then
             handle_error "$(cat <<EOF
 
-Detected old detached snapshot at ${view_dir} (no .git/ subdirectory).
+Detected old detached snapshot at ${view_dir} (no .git/ subdirectory or
+.git worktree pointer).
 This is the layout the previous wget/unzip bootstrap produced. The entrypoint
 now expects a git working tree there so you can pull/commit/push to
 ${repo_url} directly.
@@ -139,6 +140,18 @@ start_apache() {
     # Enable Apache modules
     a2enmod rewrite || handle_error "Failed to enable Apache rewrite module"
     a2enmod ssl || handle_error "Failed to enable Apache ssl module"
+
+    # The entrypoint runs as root, but Apache runs as www-data. Runtime-writable
+    # dirs created/owned by root here would make the shop 500/maintenance-mode:
+    # Smarty can't write its compile cache to source/tmp (uncaught error → offline
+    # page), and the OX log write fails too. Hand ownership to www-data.
+    log "${YELLOW}Setting www-data ownership on runtime-writable dirs...${NC}"
+    chown -R www-data:www-data \
+        /var/www/html/source/tmp \
+        /var/www/html/source/log \
+        /var/www/html/var \
+        /var/www/html/source/out \
+        || log "${RED}Warning: could not chown runtime dirs — shop may show maintenance mode${NC}"
 
     log "${GREEN}Starting Apache...${NC}"
     rm /tmp/o3setup-running
