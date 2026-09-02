@@ -145,12 +145,19 @@ start_apache() {
     # dirs created/owned by root here would make the shop 500/maintenance-mode:
     # Smarty can't write its compile cache to source/tmp (uncaught error → offline
     # page), and the OX log write fails too. Hand ownership to www-data.
+    #
+    # NOTE: only the GENERATED/gitignored paths are handed to www-data. source/out
+    # also contains git-tracked files (admin/, downloads/, media/, pictures/...)
+    # that must stay host-user-owned, otherwise `git checkout` dies with
+    # "Permission denied" when switching branches.
     log "${YELLOW}Setting www-data ownership on runtime-writable dirs...${NC}"
     chown -R www-data:www-data \
         /var/www/html/source/tmp \
         /var/www/html/source/log \
         /var/www/html/var \
-        /var/www/html/source/out \
+        /var/www/html/source/out/pictures/generated \
+        /var/www/html/source/out/pictures/master \
+        /var/www/html/source/out/pictures/promo \
         || log "${RED}Warning: could not chown runtime dirs — shop may show maintenance mode${NC}"
 
     log "${GREEN}Starting Apache...${NC}"
