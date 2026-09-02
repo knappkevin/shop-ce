@@ -123,7 +123,7 @@ install_theme() {
 }
 
 install_o3_theme() {
-    install_theme_from_git o3-theme https://github.com/o3-shop/o3-Theme.git
+    install_theme_from_git o3-theme https://github.com/knappkevin/o3-Theme.git main
 }
 
 # Function to install dependencies
